@@ -24,16 +24,10 @@
 
 using namespace std;
 
-Cleaner::Cleaner(State* state,
-                 const BuildConfig& config,
+Cleaner::Cleaner(State* state, const BuildConfig& config,
                  DiskInterface* disk_interface)
-  : state_(state),
-    config_(config),
-    dyndep_loader_(state, disk_interface),
-    cleaned_files_count_(0),
-    disk_interface_(disk_interface),
-    status_(0) {
-}
+    : state_(state), config_(config), dyndep_loader_(state, disk_interface),
+      cleaned_files_count_(0), disk_interface_(disk_interface), status_(0) {}
 
 int Cleaner::RemoveFile(const string& path) {
   return disk_interface_->RemoveFile(path);
@@ -128,7 +122,8 @@ int Cleaner::CleanDead(const BuildLog::Entries& entries) {
   Reset();
   PrintHeader();
   LoadDyndeps();
-  for (BuildLog::Entries::const_iterator i = entries.begin(); i != entries.end(); ++i) {
+  for (BuildLog::Entries::const_iterator i = entries.begin();
+       i != entries.end(); ++i) {
     Node* n = state_->LookupNode(i->first);
     // Detecting stale outputs works as follows:
     //
@@ -151,7 +146,12 @@ void Cleaner::DoCleanTarget(Node* target) {
   if (Edge* e = target->in_edge()) {
     // Do not try to remove phony targets
     if (!e->is_phony()) {
-      Remove(target->path());
+      // Remove all outputs of this edge, not just the named target.
+      // A multi-output edge produces all its outputs from a single command,
+      // so they must be cleaned together.
+      for (Node* output : e->outputs_) {
+        Remove(output->path());
+      }
       RemoveEdgeFiles(e);
     }
     for (vector<Node*>::iterator n = e->inputs_.begin(); n != e->inputs_.end();
